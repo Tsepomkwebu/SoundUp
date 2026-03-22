@@ -1,5 +1,5 @@
-import os
 import uuid
+import shutil
 import asyncio
 from pathlib import Path
 from fastapi import APIRouter, UploadFile, File, HTTPException, BackgroundTasks
@@ -31,15 +31,17 @@ async def upload_video(
             detail=f"Unsupported file type '{ext}'. Upload MP4 or MOV.",
         )
 
-    # Read and size-check
-    contents = await file.read()
-    if len(contents) > MAX_FILE_SIZE_BYTES:
-        raise HTTPException(status_code=413, detail="File exceeds 500 MB limit.")
-
-    # Persist upload
+    # Stream directly to disk — never load the full file into RAM
     job_id = str(uuid.uuid4())
     input_path = UPLOAD_DIR / f"{job_id}{ext}"
-    input_path.write_bytes(contents)
+    bytes_written = 0
+    with open(input_path, "wb") as out:
+        for chunk in file.file:
+            bytes_written += len(chunk)
+            if bytes_written > MAX_FILE_SIZE_BYTES:
+                input_path.unlink(missing_ok=True)
+                raise HTTPException(status_code=413, detail="File exceeds 500 MB limit.")
+            out.write(chunk)
 
     # Register job
     jobs[job_id] = {"status": "queued", "error": None}
