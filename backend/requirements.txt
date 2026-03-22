@@ -3,10 +3,7 @@ fastapi==0.111.0
 uvicorn[standard]==0.29.0
 python-multipart==0.0.9   # required for UploadFile
 
-# Audio processing
-noisereduce==3.0.2
-soundfile==0.12.1
-numpy==1.26.4
+# Audio processing — FFmpeg-only pipeline (no Python audio libs needed)
 imageio-ffmpeg==0.5.1     # bundles a static FFmpeg binary — no system install needed
 
 # Optional: uncomment if you need pitch/tempo analysis
