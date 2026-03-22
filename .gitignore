@@ -1,0 +1,28 @@
+# Environment & secrets
+.env
+credentials.json
+token.json
+
+# Temp processing files
+.tmp/
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.venv/
+venv/
+env/
+*.egg-info/
+dist/
+build/
+.pytest_cache/
+
+# Node (if frontend grows into Next.js)
+node_modules/
+.next/
+out/
+
+# OS
+.DS_Store
+Thumbs.db

@@ -1,0 +1,26 @@
+services:
+  - type: web
+    name: soundup-api
+    env: python
+    region: oregon
+    plan: free          # upgrade to starter ($7/mo) for production
+    rootDir: backend
+    buildCommand: "pip install -r requirements.txt"
+    startCommand: "uvicorn main:app --host 0.0.0.0 --port $PORT --workers 1"
+
+    # Install system dependencies (FFmpeg)
+    # Render supports apt packages via this key
+    apt:
+      - ffmpeg
+
+    envVars:
+      - key: PYTHONUNBUFFERED
+        value: "1"
+
+    # Disk for temporary file storage
+    # Free tier: ephemeral disk only (files lost on restart — fine for MVP)
+    # Paid tier: add persistent disk below
+    # disk:
+    #   name: tmp-storage
+    #   mountPath: /opt/render/project/src/.tmp
+    #   sizeGB: 5

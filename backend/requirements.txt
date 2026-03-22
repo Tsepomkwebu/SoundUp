@@ -1,0 +1,12 @@
+# Web framework
+fastapi==0.111.0
+uvicorn[standard]==0.29.0
+python-multipart==0.0.9   # required for UploadFile
+
+# Audio processing
+noisereduce==3.0.2
+soundfile==0.12.1
+numpy==1.26.4
+
+# Optional: uncomment if you need pitch/tempo analysis
+# librosa==0.10.2

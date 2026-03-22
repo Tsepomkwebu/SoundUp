@@ -1,0 +1,309 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>SoundUp — Audio Enhancer</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: #0f0f0f;
+      color: #f0f0f0;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 2rem;
+    }
+
+    h1 { font-size: 2rem; margin-bottom: 0.25rem; }
+    p.subtitle { color: #888; margin-bottom: 2rem; font-size: 0.95rem; }
+
+    .card {
+      background: #1a1a1a;
+      border: 1px solid #2a2a2a;
+      border-radius: 12px;
+      padding: 2rem;
+      width: 100%;
+      max-width: 480px;
+    }
+
+    /* Drop zone */
+    .drop-zone {
+      border: 2px dashed #444;
+      border-radius: 8px;
+      padding: 2.5rem 1rem;
+      text-align: center;
+      cursor: pointer;
+      transition: border-color 0.2s, background 0.2s;
+      margin-bottom: 1.25rem;
+    }
+    .drop-zone.dragover { border-color: #7c3aed; background: #1e1230; }
+    .drop-zone input[type="file"] { display: none; }
+    .drop-zone .icon { font-size: 2.5rem; margin-bottom: 0.5rem; }
+    .drop-zone .hint { color: #888; font-size: 0.85rem; margin-top: 0.4rem; }
+    #file-name { margin-top: 0.5rem; font-size: 0.9rem; color: #a78bfa; min-height: 1.2em; }
+
+    /* Button */
+    button {
+      width: 100%;
+      padding: 0.75rem;
+      border: none;
+      border-radius: 8px;
+      background: #7c3aed;
+      color: #fff;
+      font-size: 1rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    button:hover:not(:disabled) { background: #6d28d9; }
+    button:disabled { background: #3b2a6e; color: #888; cursor: not-allowed; }
+
+    /* Progress */
+    .progress-wrap {
+      margin-top: 1.25rem;
+      display: none;
+    }
+    .progress-wrap.visible { display: block; }
+    .progress-bar-bg {
+      background: #2a2a2a;
+      border-radius: 99px;
+      height: 6px;
+      overflow: hidden;
+    }
+    .progress-bar {
+      height: 100%;
+      background: #7c3aed;
+      width: 0%;
+      transition: width 0.4s;
+      border-radius: 99px;
+    }
+    .progress-bar.indeterminate {
+      width: 40%;
+      animation: slide 1.2s ease-in-out infinite;
+    }
+    @keyframes slide {
+      0%   { transform: translateX(-100%); }
+      100% { transform: translateX(350%); }
+    }
+    .status-text {
+      margin-top: 0.6rem;
+      font-size: 0.85rem;
+      color: #888;
+      text-align: center;
+    }
+
+    /* Download */
+    .download-wrap {
+      margin-top: 1.25rem;
+      display: none;
+    }
+    .download-wrap.visible { display: block; }
+    .download-btn {
+      background: #065f46;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.5rem;
+      text-decoration: none;
+      color: #fff;
+      padding: 0.75rem;
+      border-radius: 8px;
+      font-weight: 600;
+      font-size: 1rem;
+      transition: background 0.2s;
+    }
+    .download-btn:hover { background: #047857; }
+
+    /* Error */
+    .error-box {
+      display: none;
+      margin-top: 1rem;
+      background: #2d1010;
+      border: 1px solid #7f1d1d;
+      color: #fca5a5;
+      border-radius: 8px;
+      padding: 0.75rem 1rem;
+      font-size: 0.85rem;
+    }
+    .error-box.visible { display: block; }
+  </style>
+</head>
+<body>
+
+<h1>SoundUp</h1>
+<p class="subtitle">Enhance audio for TikTok, Reels &amp; YouTube Shorts</p>
+
+<div class="card">
+  <div class="drop-zone" id="drop-zone">
+    <div class="icon">🎬</div>
+    <div>Drop your video here or <strong>browse</strong></div>
+    <div class="hint">MP4 or MOV · max 500 MB</div>
+    <input type="file" id="file-input" accept=".mp4,.mov" />
+    <div id="file-name"></div>
+  </div>
+
+  <button id="upload-btn" disabled>Enhance Audio</button>
+
+  <div class="progress-wrap" id="progress-wrap">
+    <div class="progress-bar-bg">
+      <div class="progress-bar indeterminate" id="progress-bar"></div>
+    </div>
+    <div class="status-text" id="status-text">Uploading…</div>
+  </div>
+
+  <div class="download-wrap" id="download-wrap">
+    <a class="download-btn" id="download-link" href="#" download>
+      ⬇ Download Enhanced Video
+    </a>
+  </div>
+
+  <div class="error-box" id="error-box"></div>
+</div>
+
+<script>
+  // ── Config ────────────────────────────────────────────────────────────────
+  const API_BASE = "http://localhost:8000/api";  // Change for production
+  const POLL_INTERVAL_MS = 2000;
+
+  // ── Elements ──────────────────────────────────────────────────────────────
+  const dropZone    = document.getElementById("drop-zone");
+  const fileInput   = document.getElementById("file-input");
+  const fileName    = document.getElementById("file-name");
+  const uploadBtn   = document.getElementById("upload-btn");
+  const progressWrap = document.getElementById("progress-wrap");
+  const progressBar = document.getElementById("progress-bar");
+  const statusText  = document.getElementById("status-text");
+  const downloadWrap = document.getElementById("download-wrap");
+  const downloadLink = document.getElementById("download-link");
+  const errorBox    = document.getElementById("error-box");
+
+  let selectedFile = null;
+
+  // ── File selection ────────────────────────────────────────────────────────
+  dropZone.addEventListener("click", () => fileInput.click());
+
+  fileInput.addEventListener("change", () => {
+    handleFile(fileInput.files[0]);
+  });
+
+  dropZone.addEventListener("dragover", (e) => {
+    e.preventDefault();
+    dropZone.classList.add("dragover");
+  });
+  dropZone.addEventListener("dragleave", () => dropZone.classList.remove("dragover"));
+  dropZone.addEventListener("drop", (e) => {
+    e.preventDefault();
+    dropZone.classList.remove("dragover");
+    handleFile(e.dataTransfer.files[0]);
+  });
+
+  function handleFile(file) {
+    if (!file) return;
+    const ext = file.name.split(".").pop().toLowerCase();
+    if (!["mp4", "mov"].includes(ext)) {
+      showError("Only MP4 and MOV files are supported.");
+      return;
+    }
+    if (file.size > 500 * 1024 * 1024) {
+      showError("File exceeds the 500 MB limit.");
+      return;
+    }
+    selectedFile = file;
+    fileName.textContent = file.name;
+    uploadBtn.disabled = false;
+    hideError();
+    downloadWrap.classList.remove("visible");
+  }
+
+  // ── Upload & process ──────────────────────────────────────────────────────
+  uploadBtn.addEventListener("click", async () => {
+    if (!selectedFile) return;
+
+    resetUI();
+    uploadBtn.disabled = true;
+    progressWrap.classList.add("visible");
+    setStatus("Uploading…");
+
+    const formData = new FormData();
+    formData.append("file", selectedFile);
+
+    let jobId;
+    try {
+      const res = await fetch(`${API_BASE}/upload`, {
+        method: "POST",
+        body: formData,
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ detail: res.statusText }));
+        throw new Error(err.detail || "Upload failed.");
+      }
+      const data = await res.json();
+      jobId = data.job_id;
+    } catch (err) {
+      showError("Upload error: " + err.message);
+      uploadBtn.disabled = false;
+      progressWrap.classList.remove("visible");
+      return;
+    }
+
+    setStatus("Processing audio…");
+    pollStatus(jobId);
+  });
+
+  function pollStatus(jobId) {
+    const interval = setInterval(async () => {
+      try {
+        const res = await fetch(`${API_BASE}/status/${jobId}`);
+        const data = await res.json();
+
+        if (data.status === "done") {
+          clearInterval(interval);
+          setStatus("Done! Your video is ready.");
+          progressBar.classList.remove("indeterminate");
+          progressBar.style.width = "100%";
+          showDownload(jobId);
+        } else if (data.status === "error") {
+          clearInterval(interval);
+          showError("Processing failed: " + (data.error || "Unknown error."));
+          progressWrap.classList.remove("visible");
+          uploadBtn.disabled = false;
+        }
+        // "queued" / "processing" → keep polling
+      } catch {
+        // network hiccup — keep polling
+      }
+    }, POLL_INTERVAL_MS);
+  }
+
+  // ── UI helpers ────────────────────────────────────────────────────────────
+  function setStatus(msg) { statusText.textContent = msg; }
+
+  function showDownload(jobId) {
+    downloadLink.href = `${API_BASE}/download/${jobId}`;
+    downloadLink.setAttribute("download", `enhanced_${jobId}.mp4`);
+    downloadWrap.classList.add("visible");
+    uploadBtn.disabled = false;
+  }
+
+  function showError(msg) {
+    errorBox.textContent = msg;
+    errorBox.classList.add("visible");
+  }
+
+  function hideError() { errorBox.classList.remove("visible"); }
+
+  function resetUI() {
+    hideError();
+    downloadWrap.classList.remove("visible");
+    progressBar.style.width = "0%";
+    progressBar.classList.add("indeterminate");
+  }
+</script>
+
+</body>
+</html>
