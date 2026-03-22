@@ -4,6 +4,8 @@ import asyncio
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
 from routers.video import router as video_router
 
 # Ensure temp directories exist on startup
@@ -37,3 +39,9 @@ app.include_router(video_router, prefix="/api")
 @app.get("/health")
 def health():
     return {"status": "ok"}
+
+
+# Serve frontend — must come last so /api routes take priority
+FRONTEND_DIR = os.path.join(os.path.dirname(__file__), "..", "frontend")
+
+app.mount("/", StaticFiles(directory=FRONTEND_DIR, html=True), name="frontend")
