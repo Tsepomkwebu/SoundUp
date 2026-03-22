@@ -28,22 +28,22 @@ def process_video(input_path: str, job_id: str) -> str:
     output_mp4 = OUTPUT_DIR / f"{job_id}_processed.mp4"
 
     audio_filters = ",".join([
-        # 1. Cut low-frequency rumble (air con, traffic, wind below 80 Hz)
-        "highpass=f=80",
+        # 1. Cut low-frequency rumble (AC hum, wind, traffic below 100 Hz)
+        "highpass=f=100",
 
-        # 2. FFT noise reduction
-        #    nf=-20  : noise floor estimate (dB) — lower = more aggressive
-        #    nr=12   : amount of noise reduction (dB) — higher = more reduction
-        #    nt=w    : assume broadband/white noise profile (best for room noise)
-        "afftdn=nf=-20:nr=12:nt=w",
+        # 2. First pass — aggressive FFT spectral subtraction
+        #    nf=-15 : noise floor (was -20, more aggressive now)
+        #    nr=20  : 20 dB reduction (was 12)
+        "afftdn=nf=-15:nr=20:nt=w",
 
-        # 3. Gentle compression to even out volume differences between
-        #    quiet and loud speech, without sounding over-compressed
-        #    threshold=-18dB, ratio 2.5:1, fast attack, medium release
+        # 3. Second pass — non-local means denoiser (catches residual noise)
+        #    s=7 : denoising strength (noticeable but avoids robotic artifacts)
+        "anlmdn=s=7:p=0.002",
+
+        # 4. Gentle compression to even out speech volume
         "acompressor=threshold=0.025:ratio=2.5:attack=5:release=100:makeup=2",
 
-        # 4. EBU R128 loudness normalisation to -14 LUFS
-        #    Matches YouTube, TikTok, and Instagram Reels targets
+        # 5. EBU R128 loudness normalisation — -14 LUFS social media standard
         "loudnorm=I=-14:TP=-1:LRA=11",
     ])
 
