@@ -6,12 +6,15 @@ Audio processing pipeline:
   4. Mux the cleaned audio back into the original video (FFmpeg, no video re-encode)
 """
 
-import os
 import subprocess
 from pathlib import Path
 
+import imageio_ffmpeg
 import soundfile as sf
 import noisereduce as nr
+
+# Use the bundled static FFmpeg binary (no system install required)
+FFMPEG = imageio_ffmpeg.get_ffmpeg_exe()
 
 AUDIO_DIR = Path(".tmp/audio")
 OUTPUT_DIR = Path(".tmp/output")
@@ -55,7 +58,7 @@ def process_video(input_path: str, job_id: str) -> str:
 def _extract_audio(video_path: Path, out_wav: Path):
     """Extract stereo 44.1 kHz 16-bit PCM WAV from the video."""
     cmd = [
-        "ffmpeg", "-y",
+        FFMPEG, "-y",
         "-i", str(video_path),
         "-vn",                   # drop video stream
         "-acodec", "pcm_s16le",  # uncompressed PCM for Python processing
@@ -107,7 +110,7 @@ def _normalize_loudness(in_wav: Path, out_wav: Path):
     These values match YouTube, TikTok, and Instagram Reels standards.
     """
     cmd = [
-        "ffmpeg", "-y",
+        FFMPEG, "-y",
         "-i", str(in_wav),
         "-af", (
             f"loudnorm="
@@ -132,7 +135,7 @@ def _mux_audio(video_path: Path, audio_path: Path, output_path: Path):
     Video stream is copied as-is (no re-encode) for speed and quality preservation.
     """
     cmd = [
-        "ffmpeg", "-y",
+        FFMPEG, "-y",
         "-i", str(video_path),   # original video (video + old audio)
         "-i", str(audio_path),   # processed audio
         "-c:v", "copy",          # copy video stream without re-encoding

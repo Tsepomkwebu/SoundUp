@@ -7,6 +7,7 @@ python-multipart==0.0.9   # required for UploadFile
 noisereduce==3.0.2
 soundfile==0.12.1
 numpy==1.26.4
+imageio-ffmpeg==0.5.1     # bundles a static FFmpeg binary — no system install needed
 
 # Optional: uncomment if you need pitch/tempo analysis
 # librosa==0.10.2
