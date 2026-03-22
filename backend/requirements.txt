@@ -2,7 +2,6 @@
 fastapi==0.111.0
 uvicorn[standard]==0.29.0
 python-multipart==0.0.9   # required for UploadFile
-aiofiles==23.2.1          # required for StaticFiles
 
 # Audio processing
 noisereduce==3.0.2
