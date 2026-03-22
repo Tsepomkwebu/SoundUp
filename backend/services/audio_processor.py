@@ -1,12 +1,14 @@
 """
 Audio processing pipeline — FFmpeg-only, single pass.
 
-Uses FFmpeg's built-in filters instead of loading audio into Python memory,
-making this safe to run on low-RAM servers (512 MB Render free tier).
+Optimised for Render free tier (512 MB RAM, CPU-only). All processing
+is done with FFmpeg's built-in filters — no Python audio libs needed.
 
-  afftdn  — FFT-based noise reduction (no Python memory spike)
-  loudnorm — EBU R128 loudness normalization to -14 LUFS
-  -c:v copy — video stream copied without re-encoding (fast, lossless)
+Filter chain (in order):
+  highpass      — cut low-frequency rumble below 80 Hz (AC hum, wind, traffic)
+  afftdn        — FFT-based spectral noise reduction
+  acompressor   — gentle dynamic compression to even out speech volume
+  loudnorm      — EBU R128 loudness target (-14 LUFS, social media standard)
 """
 
 import subprocess
@@ -20,19 +22,29 @@ OUTPUT_DIR = Path(".tmp/output")
 
 def process_video(input_path: str, job_id: str) -> str:
     """
-    Single-pass FFmpeg pipeline:
-      1. Apply FFT noise reduction (afftdn)
-      2. Normalize loudness to -14 LUFS / -1 dBTP (loudnorm)
-      3. Copy video stream as-is, replace audio track
-
-    Returns the path to the processed output video.
+    Single-pass FFmpeg pipeline. Returns path to processed video.
     """
     input_path = Path(input_path)
     output_mp4 = OUTPUT_DIR / f"{job_id}_processed.mp4"
 
     audio_filters = ",".join([
-        "afftdn=nf=-25",                          # noise floor -25 dB
-        "loudnorm=I=-14:TP=-1:LRA=11",            # -14 LUFS, social media standard
+        # 1. Cut low-frequency rumble (air con, traffic, wind below 80 Hz)
+        "highpass=f=80",
+
+        # 2. FFT noise reduction
+        #    nf=-20  : noise floor estimate (dB) — lower = more aggressive
+        #    nr=12   : amount of noise reduction (dB) — higher = more reduction
+        #    nt=w    : assume broadband/white noise profile (best for room noise)
+        "afftdn=nf=-20:nr=12:nt=w",
+
+        # 3. Gentle compression to even out volume differences between
+        #    quiet and loud speech, without sounding over-compressed
+        #    threshold=-18dB, ratio 2.5:1, fast attack, medium release
+        "acompressor=threshold=0.025:ratio=2.5:attack=5:release=100:makeup=2",
+
+        # 4. EBU R128 loudness normalisation to -14 LUFS
+        #    Matches YouTube, TikTok, and Instagram Reels targets
+        "loudnorm=I=-14:TP=-1:LRA=11",
     ])
 
     cmd = [
